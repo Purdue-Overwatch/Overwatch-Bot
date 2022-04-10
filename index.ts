@@ -148,7 +148,16 @@ async function requestRole(role: Role, guildMember: GuildMember, interaction: Bu
             }
             break;
 
-        default: response = {content: "Sorry, this functionality is not ready yet!", ephemeral: true}
+        default:
+            if (hasRole) {
+                response = {content: `You have removed the role **${role.name}** from yourself.`, ephemeral: true}
+                await removeRole(role.id, guildMember);
+            } else {
+                response = {content: `You have applied the role **${role.name}** to yourself.`, ephemeral: true}
+                await addRole(role.id, guildMember);
+
+            }
+            break;
     }
 
     return response;
