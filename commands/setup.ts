@@ -128,7 +128,7 @@ async function buildRanksMenu() {
                 .setEmoji(grandmaster),
             new MessageButton()
                 .setCustomId(config.roles.ranks.god)
-                .setLabel("T500")
+                .setLabel("God")
                 .setStyle("SECONDARY")
                 .setEmoji(god),
         )
