@@ -1,7 +1,8 @@
+import {collections} from "../database/database.service";
 import * as config from "../config.json";
-import {bot} from "../index";
 import {CategoryChannel} from "discord.js";
 import Player from "./Player";
+import {bot} from "../index";
 
 export default class Team {
     private _id: string;
@@ -77,7 +78,7 @@ export default class Team {
     async setWinner() {
         await this.players.forEach(object => {
             Player.get(object["_id"]).then(player => {
-                player.points += 10;
+                player.points += 2;
                 player.wins += 1;
                 Player.put(player);
             });
@@ -87,7 +88,7 @@ export default class Team {
     async setLoser() {
         await this.players.forEach(object => {
             Player.get(object["_id"]).then(player => {
-                player.points -= player.points > 7 ? 7 : player.points;
+                player.points += 1;
                 player.losses += 1;
                 Player.put(player);
             });
@@ -96,20 +97,7 @@ export default class Team {
 
     async createChannel() {
         const category = await bot.guild.channels.fetch(config.categories.pug) as CategoryChannel;
-        const channel = await category.createChannel(`Team ${this.index} Voice`,
-            {type: "GUILD_VOICE", permissionOverwrites: [
-                    {
-                        id: config.guild,
-                        deny: ["USE_VAD"],
-                        allow: ["VIEW_CHANNEL", "CONNECT"]
-                    },
-                    {
-                        id: config.roles.sergeant,
-                        allow: ["MOVE_MEMBERS", "CONNECT", "SPEAK", "USE_VAD"]
-                    }
-                ]
-            }
-        )
+        const channel = await category.createChannel(`Team ${this.index} Voice`, {type: "GUILD_VOICE"})
         for (const object of this._players) {
             let player = Player.fromObject(object);
             await channel.permissionOverwrites.create(
@@ -131,7 +119,7 @@ export default class Team {
             for (let i = 0; i < this.players.length; i++) {
                 try {
                     let member = await bot.guild.members.fetch(Player.fromObject(this.players[i]).id);
-                    await member.voice.setChannel(config.channels.voice)
+                    await member.voice.setChannel(config.channels["lobby-voice"])
                 } catch (ignored) {}
             }
             await channel.delete();

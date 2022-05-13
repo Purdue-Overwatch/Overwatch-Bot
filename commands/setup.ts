@@ -21,6 +21,8 @@ module.exports = {
             .addChoice("verification", "verification_menu")
             .addChoice("welcome", "welcome_menu")
             .addChoice("ranks", "ranks_menu")
+            .addChoice("roles", "roles_menu")
+            .addChoice("pronouns", "pronouns_menu")
         ),
 
     permissions: [
@@ -42,6 +44,8 @@ module.exports = {
             case "verification_menu": return buildVerificationMenu();
             case "ranks_menu": return await buildRanksMenu();
             case "welcome_menu": return buildWelcomeMenu();
+            case "roles_menu": return await buildRolesMenu();
+            case "pronouns_menu": return await buildPronounsMenu();
             default: return ({content: "Sorry, the specified menu does not exist", ephemeral: true});
         }
     }
@@ -63,7 +67,7 @@ async function buildVerificationMenu() {
                 .setLabel("Purdue")
                 .setStyle("PRIMARY"),
             new MessageButton()
-                .setCustomId(config.roles["non-purdue"])
+                .setCustomId(config.roles.other)
                 .setLabel("Non-Purdue")
                 .setStyle("SECONDARY"),
         );
@@ -128,7 +132,7 @@ async function buildRanksMenu() {
                 .setEmoji(grandmaster),
             new MessageButton()
                 .setCustomId(config.roles.ranks.god)
-                .setLabel("God")
+                .setLabel("T500")
                 .setStyle("SECONDARY")
                 .setEmoji(god),
         )
@@ -136,13 +140,73 @@ async function buildRanksMenu() {
     return ({embeds: [embed], components: [row, row2]});
 }
 
+async function buildRolesMenu() {
+    let embed = new MessageEmbed()
+        .setTitle("Overwatch Roles Menu")
+        .setColor("#f1c40f")
+        .setDescription("Select what roles you play!")
+
+    let tank = await bot.guild.emojis.fetch(config.emotes.tank);
+    let support = await bot.guild.emojis.fetch(config.emotes.support);
+    let damage = await bot.guild.emojis.fetch(config.emotes.damage);
+
+    let row = new MessageActionRow()
+        .addComponents(
+            new MessageButton()
+                .setCustomId(config.roles.roles.tank)
+                .setLabel("Tank")
+                .setStyle("SECONDARY")
+                .setEmoji(tank),
+            new MessageButton()
+                .setCustomId(config.roles.roles.support)
+                .setLabel("Support")
+                .setStyle("SECONDARY")
+                .setEmoji(support),
+            new MessageButton()
+                .setCustomId(config.roles.roles.damage)
+                .setLabel("Damage")
+                .setStyle("SECONDARY")
+                .setEmoji(damage)
+        )
+
+    return ({embeds: [embed], components: [row]});
+}
+
+async function buildPronounsMenu() {
+    let embed = new MessageEmbed()
+        .setTitle("Pronoun Roles Menu")
+        .setColor("#f1c40f")
+        .setDescription("Pick any pronouns that apply to you!")
+
+    let row = new MessageActionRow()
+        .addComponents(
+            new MessageButton()
+                .setCustomId(config.roles.pronouns["they/them"])
+                .setLabel("They/Them")
+                .setStyle("SECONDARY"),
+            new MessageButton()
+                .setCustomId(config.roles.pronouns["she/her"])
+                .setLabel("She/Her")
+                .setStyle("SECONDARY"),
+            new MessageButton()
+                .setCustomId(config.roles.pronouns["he/him"])
+                .setLabel("He/Him")
+                .setStyle("SECONDARY"),
+            new MessageButton()
+                .setCustomId(config.roles.pronouns["she/they"])
+                .setLabel("She/They")
+                .setStyle("SECONDARY"),
+            new MessageButton()
+                .setCustomId(config.roles.pronouns["he/they"])
+                .setLabel("He/They")
+                .setStyle("SECONDARY")
+        )
+
+    return ({embeds: [embed], components: [row]});
+}
+
 async function buildWelcomeMenu() {
     let row
-    let embed;
-
-    embed = new MessageEmbed()
-        .setTitle("Access the Server!")
-        .setColor("#f1c40f")
 
     row = new MessageActionRow()
         .addComponents(
@@ -152,5 +216,5 @@ async function buildWelcomeMenu() {
                 .setStyle("SUCCESS")
                 .setEmoji(config.emotes.logo)
         )
-    return ({embeds: [embed], components: [row]});
+    return ({components: [row]});
 }

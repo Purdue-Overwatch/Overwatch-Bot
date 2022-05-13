@@ -3,16 +3,16 @@ import {bot} from "../index";
 import Player from "./Player";
 import Game from "./Game";
 import * as config from "../config.json";
-import BasePlayer from "./BasePlayer";
-import * as process from "process";
 
 export default class Queue extends Map<string, NodeJS.Timeout>{
-    private _time: number;
-    private _channel: TextChannel;
+    private readonly _time: number;
+    private readonly _maxsize: number;
+    private readonly _channel: TextChannel;
 
-    public constructor(channel: TextChannel) {
+    public constructor(channel: TextChannel, maxsize: number) {
         super();
         this._time = 3600000;
+        this._maxsize = maxsize;
         this._channel = channel;
     }
 
@@ -20,58 +20,54 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
         return this._time;
     }
 
-    public set time(value: number) {
-        this._time = value;
-    }
-
-    get channel(): TextChannel {
+    public get channel(): TextChannel {
         return this._channel;
     }
 
-    set channel(value: TextChannel) {
-        this._channel = value;
+    public get maxsize(): number {
+        return this._maxsize;
     }
 
-    public async join(player: BasePlayer): Promise<string> {
-        if (this.has(player.id)) return ("You are already in the queue.");
-        else if (this.size == 10) return ("The queue is already full.");
+    public async join(player: Player) {
+        if (this.has(player.id)) return {content: "You are already in the queue.", ephemeral: true};
+        else if (this.size == this.maxsize) return {content: "The queue is already full.", ephemeral: true};
         else {
             const timeout = global.setTimeout(Queue.timeout, this.time, this, player);
             this.set(player.id, timeout)
-            if (this.size == 10) {
+            if (this.size == this.maxsize) {
                 await this.update("A new game is starting...", 0);
                 this.forEach((timeout) => {
                     clearTimeout(timeout);
                 })
-                bot.queue = new Queue(bot.lobbyChannel);
+                if (this.maxsize == 10) {
+                    bot.queueTwo = new Queue(bot.lobbyChannelTwo, this._maxsize);
+                } else {
+                    bot.queueOne = new Queue(bot.lobbyChannel, this._maxsize);
+                }
                 await Game.create(this)
             } else this.update(`${player.username} has joined`, 1).then();
-            return ("You have joined the queue.");
         }
     }
 
-    public remove(player: BasePlayer): string {
-        if (this.size == 10) return ("Queue has filled. You cannot leave at this time.");
+    public async remove(player: Player) {
+        if (this.size == this.maxsize) return {content: "Queue has filled. You cannot leave at this time.", ephemeral: true};
         else if (this.has(player.id)) {
             clearTimeout(this.get(player.id));
             this.delete(player.id);
-            this.update(`${player.username} has left`, 2).then(() => {
-                return ("You have left the queue.")
-            });
-        } else return ("You are not in the queue.");
+            await this.update(`${player.username} has left`, 2);
+        } else return {content: "You are not in the queue", ephemeral: true};
     }
 
     public async update(update: string, code: number, message = null) {
         let messages = (await this.channel.messages.fetch({limit: 10}))
             .filter(message => message.author == bot.user);
-
         for (const [, message] of messages) {
             if (message.embeds[0] != undefined && message.embeds[0] != null) {
-                if (message.embeds[0].title.toLowerCase().includes("PUGs")) await message.delete();
+                if (message.embeds[0].title.toLowerCase().includes("pugs")) await message.delete();
             }
         }
         let options;
-        let embed = new MessageEmbed().setTitle("PUGs: " + update.concat(` [${this.size}/10]`)).setDescription("");
+        let embed = new MessageEmbed().setTitle("PUGs: " + update.concat(` [${this.size}/${this.maxsize}]`)).setDescription("");
         const row = new MessageActionRow().addComponents(
             new MessageButton().setLabel("Join").setCustomId("join").setStyle("SUCCESS"),
             new MessageButton().setLabel("Leave").setCustomId("leave").setStyle("DANGER"),
@@ -94,7 +90,7 @@ export default class Queue extends Map<string, NodeJS.Timeout>{
 
     }
 
-    static async timeout(queue: Queue, player: BasePlayer) {
+    static async timeout(queue: Queue, player: Player) {
         queue.delete(player.id);
         await queue.update(`${player.username} has been timed out`, 2, `<@!${player.id}>`);
     }

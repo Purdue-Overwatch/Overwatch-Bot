@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import * as Canvas from "canvas";
 import Player from "./Player";
+import {collections} from "../database/database.service";
 
 export default class Game {
     private _id: string;
@@ -47,12 +48,9 @@ export default class Game {
             players.push(await Player.get(key));
             queue.delete(key);
         }
-        players = Game.sort(players);
+        players = mergeSort(players);
         players.forEach(player => {
             mentions = mentions.concat(`<@!${player.id}> `);
-            channel.permissionOverwrites.create(
-                player.id, {"SEND_MESSAGES": true}
-            )
         });
         let teamOne = await Team.create(players[0], 1);
         let teamTwo = await Team.create(players[1], 2);
@@ -130,7 +128,7 @@ export default class Game {
     }
 
     getMapAttachment(): MessageAttachment {
-        let mapFileName = this.map.replace(/ /g,"_").toLowerCase();
+        let mapFileName = this.map.replace(/ /g,"-").toLowerCase().replace(":","");
         return new MessageAttachment(`./maps/${mapFileName}.jpg`);
     }
 
@@ -143,27 +141,22 @@ export default class Game {
         let captainTwo = Player.fromObject(teamTwo.players[0]);
         this.players = this.players.filter((object) => object["_id"] != target.id);
         switch (this.players.length + 1) {
-            case 8: case 6:
+            case 10: case 8: case 6: case 4:
                 response ={
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick two players.`,
+                    content: `**${captainOne.username}** has picked **${target.username}**. <@!${captainTwo.id}> please pick two players.`,
                     components: [this.buildSelectMenu()]
                 };
                 break;
-            case 7: case 5:
+            case 9: case 7: case 5: case 3:
                 response = {
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainOne.id}> please pick another player.`,
-                    components: [this.buildSelectMenu()]};
-                break;
-            case 4: case 3:
-                response = {
-                    content: `**${captainOne.username}** has picked <@!${target.id}>. <@!${captainTwo.id}> please pick another player.`,
+                    content: `**${captainOne.username}** has picked **${target.username}**. <@!${captainOne.id}> please pick another player.`,
                     components: [this.buildSelectMenu()]};
                 break;
             case 2:
-                response = { content: `**${captainOne.username}** has picked <@!${target.id}>.`};
+                response = { content: `**${captainOne.username}** has picked **${target.username}**.`};
                 break;
             case 1:
-                response = {content: `**${captainOne.username}** has received <@!${target.id}>.`};
+                response = {content: `**${captainOne.username}** has received **${target.username}**.`};
                 this.phase = 2;
                 break;
         }
@@ -172,16 +165,6 @@ export default class Game {
         await Team.put(teamOne);
         await Game.put(this);
         await channel.send(response);
-    }
-
-    public static sort(players: Array<Player>): Array<Player> {
-        let newList = [];
-
-        for (let i = 0; i < 10; i++) {
-            newList.push(players[0]);
-            players = players.slice(1);
-        }
-        return newList;
     }
 
     public buildSelectMenu() {
@@ -204,21 +187,7 @@ export default class Game {
 
     static async createChannel(id) {
         const category = await bot.guild.channels.fetch(config.categories.pug) as CategoryChannel;
-        return await category.createChannel(`Game ${id}`,
-            {
-                type: "GUILD_TEXT", permissionOverwrites: [
-                    {
-                        id: config.guild,
-                        allow: ["VIEW_CHANNEL"],
-                        deny: ["SEND_MESSAGES"]
-                    },
-                    {
-                        id: config.roles.sergeant,
-                        allow: ["SEND_MESSAGES"]
-                    }
-                ]
-            }
-        );
+        return await category.createChannel(`Game ${id}`);
     }
 
     async deleteChannel() {
@@ -231,14 +200,19 @@ export default class Game {
 
     async start() {
         this.phase = 2;
+        let mentions = "";
         let channel = await bot.guild.channels.fetch(this.channel) as TextChannel;
         let embed = this.toEmbed();
         let attachment = this.getMapAttachment();
         for (let i = 0; i < 2; i ++) {
             let team = Team.fromObject(this.teams[i]);
             await team.createChannel();
+            for (let i = 0; i < team.players.length; i++) {
+                let player = Player.fromObject(team.players[i]);
+                mentions = mentions.concat(`<@!${player.id}> `);
+            }
         }
-        await channel.send({embeds: [embed], files: [attachment]});
+        await channel.send({content: mentions, embeds: [embed], files: [attachment]});
     }
 
     async sub(sub: Player, target: Player): Promise<boolean> {
@@ -276,7 +250,6 @@ export default class Game {
                 await channel.send({content: `Game ${this.id} has been called a draw.`, embeds: [this.toEmbed()]});
         }
         await this.deleteChannel();
-        //await updateRankings();
         await Game.put(this);
     }
 
@@ -286,9 +259,10 @@ export default class Game {
 
         for (let i = 0; i < 2; i++) {
             const team = Team.fromObject(this.teams[i]);
-            const title = team == this.winner ? `WINNER - Team ${team.index}` : `Team ${team.index}`;
+            let  title = `Team ${team.index}`;
+            if (this.winner != null) title = team.id == Team.fromObject(this.winner).id ? `WINNER - Team ${team.index}` : title;
             let description = `Captain: <@!${Player.fromObject(team.players[0]).id}>`;
-            for (let j = 1; j < 5; j++) {
+            for (let j = 1; j < team.players.length; j++) {
                 if (team.players[j]) description = description.concat(`\nPlayer: <@!${Player.fromObject(team.players[j]).id}>`);
             }
             embed.addField(title, description, true);
@@ -300,7 +274,7 @@ export default class Game {
             case 1: embed.setColor("RED");
                 break;
             case 2:
-                let mapFileName = this.map.replace(/ /g,"_").toLowerCase();
+                let mapFileName = this.map.replace(/ /g,"-").toLowerCase().replace(":","");
                 embed.setColor("ORANGE");
                 embed.setImage(`attachment://${mapFileName}.jpg`);
                 break;
@@ -335,7 +309,7 @@ export default class Game {
                 for (let i = 0; i < 2; i++) {
                     let team = Team.fromObject(this.teams[i]);
                     printText(ctx, `Draw`, canvas.width / 4 + i * (canvas.width / 2), 110, "#000000", `28${font}`, "center");
-                    for (let j = 0; j < 5; j++) {
+                    for (let j = 0; j < team.players.length; j++) {
                         let player = Player.fromObject(team.players[j]);
                         // let avatar = await Canvas.loadImage((await bot.guild.members.fetch(player.id)).avatarURL({format: "jpg"}));
                         // printAvatar(ctx, avatar, i, j, canvas.width);
@@ -392,6 +366,29 @@ export default class Game {
     static async delete(game: Game) {
         await collections.games.deleteOne({ _id: (game.id) });
     }
+}
+
+function mergeSort(players: Array<Player>) {
+    const half = players.length / 2
+
+    if (players.length < 2){
+        return players
+    }
+
+    const left = players.splice(0, half)
+    return merge(mergeSort(left),mergeSort(players))
+}
+
+function merge(left: Array<Player>, right: Array<Player>) {
+    let arr = []
+    while (left.length && right.length) {
+        if (left[0].rank < right[0].rank) {
+            arr.push(left.shift())
+        } else {
+            arr.push(right.shift())
+        }
+    }
+    return [ ...arr, ...left, ...right ]
 }
 
 function printText(ctx, text, x, y, color, font, alignment) {

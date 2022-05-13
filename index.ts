@@ -1,5 +1,5 @@
 import * as config from "./config.json";
-import Bot from "./Objects/Bot";
+import Bot from "./objects/Bot";
 import {
     ButtonInteraction,
     CommandInteraction,
@@ -8,7 +8,8 @@ import {
     SelectMenuInteraction,
     TextChannel
 } from "discord.js";
-import Student from "./Objects/Student";
+import Student from "./objects/Student";
+import Player from "./objects/Player";
 
 export const bot = new Bot();
 
@@ -27,7 +28,23 @@ bot.on('interactionCreate', async (interaction) => {
 });
 
 bot.on('messageCreate', async (message) => {
-
+    if (message.channelId == config.channels.verify) {
+        if (message.author.id != bot.user.id) {
+            let embed = new MessageEmbed()
+                .setDescription("Only slash commands are permitted in this channel.\n" +
+                    "Please refer to [Discord - Slash Commands FAQ](https://support.discord.com/hc/en-us/articles/1500000368501-Slash-Commands-FAQ)" +
+                    " if further instruction is needed."
+                )
+                .setColor("#f1c40f")
+            let response = await message.reply({embeds: [embed]});
+            setTimeout(async () => {
+                try {
+                    await response.delete();
+                    await message.delete();
+                } catch (e) {}
+            }, 5000);
+        }
+    }
 });
 
 bot.on('guildMemberAdd', async guildMember => {
@@ -83,28 +100,38 @@ async function handleCommand(interaction: CommandInteraction) {
 
 async function handleButton(interaction: ButtonInteraction) {
     try {
+        let response;
         let id = interaction.customId;
         switch (id) {
             case "join": case "leave": case "bump":
-                await bot.commands.get("queue").execute(interaction);
+                response = await bot.commands.get("queue").execute(interaction);
                 break;
             default:
                 let role = await interaction.guild.roles.fetch(id);
                 let guildMember = interaction.member as GuildMember;
-                let response = await requestRole(role, guildMember, interaction);
-                await interaction.reply(response);
+                response = await requestRole(role, guildMember, interaction);
+        }
+        if (response) {
+            await interaction.reply(response);
         }
         await bot.logger.info(`${interaction.component.label} button used by ${interaction.user.username}`);
     } catch (error) {
         await bot.logger.error(`${interaction.component.label} button used by ${interaction.user.username} failed`, error);
-        await interaction.reply({content: "There was an error running this handling this button.", ephemeral: true});
+        try {
+            await interaction.reply({content: "There was an error handling this button.", ephemeral: true});
+        } catch (ignored) {}
     }
 }
 
 async function handleSelectMenu(selectMenu: SelectMenuInteraction) {
+    let response;
     try {
-        await bot.commands.get("pick").execute(selectMenu);
+        response = await bot.commands.get("pick").execute(selectMenu);
         await bot.logger.info(`Select Menu option ${selectMenu.values[0]} selected by ${selectMenu.user.username}`);
+
+        if (response != null && !selectMenu.replied) {
+            await selectMenu.reply(response);
+        }
     } catch (error) {
         await bot.logger.error(`Select Menu option ${selectMenu.values[0]} selected by ${selectMenu.user.username} failed`, error);
         await selectMenu.reply({content: "There was an error handling this menu.", ephemeral: true});
@@ -127,8 +154,8 @@ async function requestRole(role: Role, guildMember: GuildMember, interaction: Bu
         case config.roles.purdue:
             if (student) {
                 response = {content: "You are verified!", ephemeral: true}
-                await addRole(config.roles.purdue, guildMember);
-                await removeRole(config.roles.other, guildMember);
+                addRole(config.roles.purdue, guildMember).then(() => {});
+                removeRole(config.roles.other, guildMember).then(() => {});
             } else response = {content: "Please follow these instructions to verify yourself:\n +" +
                     "1. Use `/verify start` to have a one-time code sent to your email.\n" +
                     "2. Use `/verify complete` with your one-time code.", ephemeral: true}
@@ -145,6 +172,20 @@ async function requestRole(role: Role, guildMember: GuildMember, interaction: Bu
                     response = {content: "You have applied the role **Other** to yourself.", ephemeral: true}
                     await addRole(config.roles.other, guildMember);
                 }
+            }
+            break;
+
+        case config.roles.pug:
+            const command = bot.commands.get("register");
+            response = await command.execute(interaction);
+            break;
+
+        case config.roles.overwatch:
+            if (hasRole) {
+                response = {content: "You already have access!", ephemeral: true};
+            } else {
+                await addRole(role.id, guildMember);
+                response = {content: "Welcome to the Club!", ephemeral: true}
             }
             break;
 

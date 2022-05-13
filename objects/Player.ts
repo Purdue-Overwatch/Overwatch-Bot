@@ -1,6 +1,7 @@
 import {GuildMember, MessageAttachment} from "discord.js";
 import * as Canvas from "canvas";
 import {bot} from "../index";
+import {collections} from "../database/database.service";
 
 export default class Player {
     private _id: string
@@ -22,11 +23,6 @@ export default class Player {
         this._rank = rank;
         this._banTime = banTime;
     } // Player
-
-    static fromString(string: string): Player{
-        const model = JSON.parse(string.slice(string.search("({)")));
-        return Player.fromObject(model);
-    } // fromString
 
     static fromObject(object): Player {
         return new Player(object._id, object._username, object._points, object._wins, object._losses, object._draws, object._rank, object._banTime);
@@ -114,7 +110,7 @@ export default class Player {
         const panel = await Canvas.loadImage("./media/panel.png");
         const gray = await Canvas.loadImage("./media/gray.png");
         const rank = await Canvas.loadImage(`./media/ranks/${index}.png`);
-        const r6logo = await Canvas.loadImage("./media/r6logo4.png");
+        const r6logo = await Canvas.loadImage("./media/logo.png");
 
         printImage(ctx, background, 0, 0, canvas.width, canvas.height, 25);
         printImage(ctx, gray, 18, 160, canvas.width - 36, canvas.height - 178, 20);

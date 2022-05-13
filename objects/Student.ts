@@ -1,3 +1,5 @@
+import {collections} from "../database/database.service";
+
 export default class Student {
     private _id: string;
     private _username: string;
@@ -14,6 +16,7 @@ export default class Student {
     }
 
     static fromObject(object) {
+        if (object == null) return null;
         return new Student(object._id, object._username, object._email, object._code, object._status);
     }
 
@@ -64,11 +67,11 @@ export default class Student {
     static async get(id: string) {
         try {
             const query = { _id: id };
-            //const student = Student.fromObject(await collections.students.findOne(query));
+            const student = Student.fromObject(await collections.students.findOne(query));
 
-            //if (student) {
-                //return student;
-           // }
+            if (student) {
+                return student;
+            }
         } catch (error) {
             return undefined;
         }
@@ -87,10 +90,10 @@ export default class Student {
     }
 
     static async put(student: Student) {
-       // await collections.students.updateOne({ _id: (student.id) }, { $set: student });
+        await collections.students.updateOne({ _id: (student.id) }, { $set: student });
     }
 
     static async delete(student: Student) {
-       // await collections.students.deleteOne({ _id: (student.id) });
+        await collections.students.deleteOne({ _id: (student.id) });
     }
 }
